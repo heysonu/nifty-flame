@@ -1,0 +1,175 @@
+#!/usr/bin/env python3
+import argparse
+import sys
+import os
+from pathlib import Path
+from datetime import datetime
+
+sys.path.insert(0, str(Path(__file__).parent))
+
+from modules.logger import setup_logger, get_logger
+from modules.config import Config
+from modules.utils import (
+    normalize_target,
+    generate_output_filename,
+    write_markdown_file,
+    format_markdown_header,
+    validate_url,
+    is_valid_domain,
+    is_valid_ip,
+)
+from modules.directory_enum import DirectoryEnumerator
+from modules.subdomain import SubdomainDiscoverer
+from modules.port_scanner import PortScanner
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(
+        description="Nifty Flame - Pentesting Reconnaissance Tool",
+        epilog="For authorized security testing only.",
+    )
+
+    parser.add_argument(
+        "-p",
+        action="store_true",
+        help="Enable port scanning",
+    )
+
+    parser.add_argument(
+        "-s",
+        action="store_true",
+        help="Enable subdomain discovery",
+    )
+
+    parser.add_argument(
+        "-d",
+        action="store_true",
+        help="Enable directory enumeration",
+    )
+
+    parser.add_argument(
+        "-u",
+        "--target",
+        required=True,
+        help="Target URL or domain (e.g., example.com or http://example.com)",
+    )
+
+    parser.add_argument(
+        "-w",
+        action="store_true",
+        help="Interactive wordlist selection",
+    )
+
+    return parser.parse_args()
+
+
+def validate_target(target: str, logger) -> str:
+    if validate_url(target):
+        return normalize_target(target)
+
+    if is_valid_domain(target) or is_valid_ip(target):
+        return target
+
+    logger.error(f"Invalid target: {target}")
+    sys.exit(1)
+
+
+def get_wordlist_path(method: str, use_custom: bool, logger) -> str:
+    if not use_custom:
+        if method == "directory":
+            return Config.DEFAULT_DIR_WORDLIST
+        elif method == "subdomain":
+            return Config.DEFAULT_SUBDOMAIN_WORDLIST
+
+    prompt = f"Enter path for {method} wordlist (or press Enter for default): "
+    user_input = input(prompt).strip()
+
+    if not user_input:
+        if method == "directory":
+            return Config.DEFAULT_DIR_WORDLIST
+        elif method == "subdomain":
+            return Config.DEFAULT_SUBDOMAIN_WORDLIST
+
+    try:
+        Config.validate_wordlist(user_input)
+        return user_input
+    except Exception as e:
+        logger.error(f"Invalid wordlist: {e}")
+        sys.exit(1)
+
+
+def create_markdown_report(method: str, target: str, output_dir: Path) -> str:
+    filename = generate_output_filename(method, target)
+    filepath = output_dir / filename
+
+    content = format_markdown_header(f"Nifty Flame - {method.capitalize()} Report", 1)
+    content += format_markdown_header(f"Target: {target}", 2)
+    content += f"**Scan Started:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+    content += format_markdown_header("Results", 2)
+    content += "*Scanning in progress...*\n\n"
+
+    write_markdown_file(str(filepath), content)
+    return str(filepath)
+
+
+def update_markdown_report(filepath: str, section: str, content: str):
+    append_content = format_markdown_header(section, 3)
+    append_content += content
+    write_markdown_file(filepath, append_content, mode="a")
+
+
+def finalize_markdown_report(filepath: str):
+    append_content = f"\n**Scan Completed:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    write_markdown_file(filepath, append_content, mode="a")
+
+
+def main():
+    args = parse_arguments()
+    logger = setup_logger()
+
+    logger.info("Nifty Flame - Pentesting Reconnaissance Tool")
+    logger.warning("For authorized security testing only!")
+
+    if not any([args.p, args.s, args.d]):
+        logger.error("At least one scanning method must be enabled (-p, -s, or -d)")
+        sys.exit(1)
+
+    target = validate_target(args.target, logger)
+    logger.info(f"Target: {target}")
+
+    output_dir = Config.get_output_dir()
+
+    if args.d:
+        logger.info("Starting directory enumeration...")
+        wordlist = get_wordlist_path("directory", args.w, logger)
+        report_path = create_markdown_report("directories", target, output_dir)
+
+        enumerator = DirectoryEnumerator(target, wordlist, report_path, logger)
+        enumerator.scan()
+        finalize_markdown_report(report_path)
+        logger.info(f"Directory enumeration completed. Report: {report_path}")
+
+    if args.s:
+        logger.info("Starting subdomain discovery...")
+        wordlist = get_wordlist_path("subdomain", args.w, logger)
+        report_path = create_markdown_report("subdomains", target, output_dir)
+
+        discoverer = SubdomainDiscoverer(target, wordlist, report_path, logger)
+        discoverer.discover()
+        finalize_markdown_report(report_path)
+        logger.info(f"Subdomain discovery completed. Report: {report_path}")
+
+    if args.p:
+        logger.info("Starting port scanning...")
+        report_path = create_markdown_report("ports", target, output_dir)
+
+        scanner = PortScanner(target, report_path, logger)
+        scanner.scan()
+        finalize_markdown_report(report_path)
+        logger.info(f"Port scanning completed. Report: {report_path}")
+
+    logger.info("All scans completed successfully!")
+
+
+if __name__ == "__main__":
+    main()

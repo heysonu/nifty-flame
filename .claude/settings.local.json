@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod +x /home/semipi/Downloads/NewTool/nifty-flame)",
+      "Bash(python3 -m venv venv)",
+      "Bash(git init *)",
+      "Bash(git add *)"
+    ]
+  }
+}
