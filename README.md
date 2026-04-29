@@ -5,7 +5,7 @@
 ### A Powerful Python3 Pentesting Reconnaissance Tool
 
 [![Python Version](https://img.shields.io/badge/python-3.7%2B-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-Educational%20Only-orange.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT%20License-orange.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)]()
 
 **Nifty Flame** is a comprehensive reconnaissance tool designed for security professionals conducting authorized security assessments. It helps identify potential attack surfaces through directory enumeration, subdomain discovery, and port scanning.
